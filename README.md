@@ -86,9 +86,9 @@ cd example
 python run_exp.py -e corridor -d diff
 ```
 
-## Examples
+## IR-SIM Examples 
 
-You can run examples in the [example](https://github.com/hanruihua/NeuPAN/tree/main/example) folder to see the navigation performance of `diff` (differential), `acker` (ackermann) and `omni` (Omnidirectional) robot powered by NeuPAN in IR-SIM. Scenarios include:
+You can run examples implemented on [IR-SIM](https://github.com/hanruihua/ir-sim) in the [example](https://github.com/hanruihua/NeuPAN/tree/main/example) folder to see the navigation performance of `diff` (differential), `acker` (ackermann) and `omni` (Omnidirectional) robot powered by NeuPAN in IR-SIM. Scenarios include:
 
 - `convex_obs` (convex obstacles)
 - `corridor` (corridor)
@@ -334,3 +334,15 @@ If you find this code or paper is helpful, please kindly star :star: this reposi
   pages={2804-2824},
   doi={10.1109/TRO.2025.3554252}}
 ```
+
+For using [IR-SIM](https://github.com/hanruihua/ir-sim) platform, please consider citing the following paper:
+
+```bibtex
+@article{han2026ir,
+  title={IR-SIM: A Lightweight Skill-Native Simulator for Navigation, Learning, and Benchmarking},
+  author={Han, Ruihua and Wang, Shuai and Li, Chengyang and Gao, Rui and Wang, Xinyi and Liu, Zhe and Li, Guoliang and Lu, Yupu and Hao, Qi and Pan, Jia and Zhao, Hengshuang},
+  journal={arXiv preprint arXiv:2606.08729},
+  year={2026}
+}
+```
+
