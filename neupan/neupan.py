@@ -1,4 +1,4 @@
-'''
+"""
 neupan file is the main class for the NeuPan algorithm. It wraps the PAN class and provides a more user-friendly interface.
 
 Developed by Ruihua Han
@@ -16,7 +16,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with NeuPAN planner. If not, see <https://www.gnu.org/licenses/>.
-'''
+"""
 
 import yaml
 import torch
@@ -28,8 +28,8 @@ import numpy as np
 from neupan.configuration import np_to_tensor, tensor_to_np
 from math import cos, sin
 
-class neupan(torch.nn.Module):
 
+class neupan(torch.nn.Module):
     """
     Args:
         receding: int, the number of steps in the receding horizon.
@@ -58,7 +58,7 @@ class neupan(torch.nn.Module):
         train_kwargs: dict = None,
         **kwargs,
     ) -> None:
-        super(neupan, self).__init__()
+        super().__init__()
 
         # mpc parameters
         self.T = receding
@@ -76,7 +76,7 @@ class neupan(torch.nn.Module):
         self.ipath = InitialPath(
             receding, step_time, ref_speed, self.robot, **ipath_kwargs
         )
-            
+
         pan_kwargs["adjust_kwargs"] = adjust_kwargs
         pan_kwargs["train_kwargs"] = train_kwargs
         self.dune_train_kwargs = train_kwargs
@@ -139,8 +139,8 @@ class neupan(torch.nn.Module):
         self.info["state_tensor"] = opt_state_tensor
         self.info["vel_tensor"] = opt_vel_tensor
         self.info["distance_tensor"] = opt_distance_tensor
-        self.info['ref_state_tensor'] = nom_input_tensor[2]
-        self.info['ref_speed_tensor'] = nom_input_tensor[3]
+        self.info["ref_state_tensor"] = nom_input_tensor[2]
+        self.info["ref_speed_tensor"] = nom_input_tensor[3]
 
         self.info["ref_state_list"] = [
             state[:, np.newaxis] for state in nom_input_np[2].T
@@ -155,20 +155,19 @@ class neupan(torch.nn.Module):
 
         action = opt_vel_np[:, 0:1]
 
-        if self.robot.kinematics == 'omni':
+        if self.robot.kinematics == "omni":
             vel = opt_vel_np[:, 0:1]
             vx = vel[0, 0] * cos(vel[1, 0])
             vy = vel[0, 0] * sin(vel[1, 0])
             action = np.array([[vx], [vy]])
 
-            self.info['omni_linear_speed'] = vel[0, 0]
-            self.info['omni_orientation'] = vel[1, 0]
+            self.info["omni_linear_speed"] = vel[0, 0]
+            self.info["omni_orientation"] = vel[1, 0]
 
         return action, self.info
 
     def check_stop(self):
         return self.min_distance < self.collision_threshold
-    
 
     def scan_to_point(
         self,
@@ -178,8 +177,8 @@ class neupan(torch.nn.Module):
         angle_range: list[float] = [-np.pi, np.pi],
         down_sample: int = 1,
     ) -> np.ndarray | None:
-        
         """
+        这是在处理原始雷达点云数据，通过两步坐标变换，将雷达点云转换为map坐标系
         input:
             state: [x, y, theta]
             scan: {}
@@ -202,7 +201,10 @@ class neupan(torch.nn.Module):
             scan_range = ranges[i]
             angle = angles[i]
 
-            if scan_range < (scan["range_max"] - 0.02) and scan_range > scan["range_min"]:
+            if (
+                scan_range < (scan["range_max"] - 0.02)
+                and scan_range > scan["range_min"]
+            ):
                 if angle > angle_range[0] and angle < angle_range[1]:
                     point = np.array(
                         [[scan_range * cos(angle)], [scan_range * sin(angle)]]
@@ -256,7 +258,10 @@ class neupan(torch.nn.Module):
             scan_range = ranges[i]
             angle = angles[i]
 
-            if scan_range < (scan["range_max"] - 0.02) and scan_range >= scan["range_min"]:
+            if (
+                scan_range < (scan["range_max"] - 0.02)
+                and scan_range >= scan["range_min"]
+            ):
                 if angle > angle_range[0] and angle < angle_range[1]:
                     point = np.array(
                         [[scan_range * cos(angle)], [scan_range * sin(angle)]]
@@ -269,6 +274,7 @@ class neupan(torch.nn.Module):
 
         point_array = np.hstack(point_cloud)
         s_trans, s_R = get_transform(np.c_[scan_offset])
+        # TODO: 这里有问题，应该是正向变换
         temp_points = s_R.T @ (
             point_array - s_trans
         )  # points in the robot state coordinate
@@ -280,10 +286,8 @@ class neupan(torch.nn.Module):
 
         return points, velocity
 
-
     def train_dune(self):
         self.pan.dune_layer.train_dune(self.dune_train_kwargs)
-
 
     def reset(self):
         self.ipath.point_index = 0
@@ -294,11 +298,10 @@ class neupan(torch.nn.Module):
         self.cur_vel_array = np.zeros_like(self.cur_vel_array)
 
     def set_initial_path(self, path):
-
-        '''
+        """
         set the initial path from the given path
         path: list of [x, y, theta, gear] 4x1 vector, gear is -1 (back gear) or 1 (forward gear)
-        '''
+        """
 
         self.ipath.set_initial_path(path)
 
@@ -309,9 +312,8 @@ class neupan(torch.nn.Module):
 
         """
         self.ipath.init_check(state)
-    
-    def set_reference_speed(self, speed: float):
 
+    def set_reference_speed(self, speed: float):
         """
         Args:
             speed: float, the reference speed of the robot
@@ -319,9 +321,8 @@ class neupan(torch.nn.Module):
 
         self.ipath.ref_speed = speed
         self.ref_speed = speed
-    
-    def update_initial_path_from_goal(self, start, goal):
 
+    def update_initial_path_from_goal(self, start, goal):
         """
         Args:
             start: [x, y, theta] or 3x1 vector
@@ -330,9 +331,7 @@ class neupan(torch.nn.Module):
 
         self.ipath.update_initial_path_from_goal(start, goal)
 
-
     def update_initial_path_from_waypoints(self, waypoints):
-
         """
         Args:
             waypoints: list of [x, y, theta] or 3x1 vector
@@ -340,9 +339,7 @@ class neupan(torch.nn.Module):
 
         self.ipath.set_ipath_with_waypoints(waypoints)
 
-
     def update_adjust_parameters(self, **kwargs):
-
         """
         update the adjust parameters value: q_s, p_u, eta, d_max, d_min
 
@@ -359,55 +356,48 @@ class neupan(torch.nn.Module):
         self.pan.nrmp_layer.update_adjust_parameters_value(**kwargs)
 
     @property
+    # 将函数伪装成属性
     def min_distance(self):
         return self.pan.min_distance
-    
+
     @property
     def dune_points(self):
         return self.pan.dune_points
-    
+
     @property
     def nrmp_points(self):
         return self.pan.nrmp_points
-    
+
     @property
     def initial_path(self):
         return self.ipath.initial_path
-    
+
     @property
     def adjust_parameters(self):
         return self.pan.nrmp_layer.adjust_parameters
-    
+
     @property
     def waypoints(self):
-
-        '''
+        """
         Waypoints for generating the initial path
-        '''
+        """
 
         return self.ipath.waypoints
-    
+
     @property
     def opt_trajectory(self):
-
-        '''
+        """
         MPC receding horizon trajectory under the velocity sequence
         return a list of state sequence, each state is a 3x1 vector
-        '''
+        """
 
         return self.info["opt_state_list"]
-    
+
     @property
     def ref_trajectory(self):
-
-        '''
+        """
         Reference trajectory on the initial path
         return a list of state sequence, each state is a 3x1 vector
-        '''
+        """
 
         return self.info["ref_state_list"]
-
-    
-
-    
-

@@ -84,7 +84,9 @@ class NRMP(torch.nn.Module):
         if isinstance(q_s, (list, np.ndarray)):
             q_s_array = np.array(q_s).flatten()
             if q_s_array.shape[0] != 3:
-                raise ValueError(f"q_s must be a scalar or a 3-element list/array, got {q_s_array.shape[0]} elements")
+                raise ValueError(
+                    f"q_s must be a scalar or a 3-element list/array, got {q_s_array.shape[0]} elements"
+                )
             # Create tensor from numpy array and explicitly enable gradients
             self.q_s = np_to_tensor(q_s_array, False).reshape(3, 1)
             self.q_s.requires_grad_(True)
@@ -109,7 +111,7 @@ class NRMP(torch.nn.Module):
         self.problem_definition()
 
         self.obstacle_points = None
-        self.solver = kwargs.get("solver", "ECOS") 
+        self.solver = kwargs.get("solver", "ECOS")
 
     @time_it("- nrmp forward")
     def forward(
@@ -141,7 +143,9 @@ class NRMP(torch.nn.Module):
             nom_s, nom_u, ref_s, ref_us, mu_list, lam_list, point_list
         )
 
-        solutions = self.nrmp_layer(*parameter_values, solver_args={"solve_method": self.solver}) # see cvxpylayers and cvxpy for more details
+        solutions = self.nrmp_layer(
+            *parameter_values, solver_args={"solve_method": self.solver}
+        )  # see cvxpylayers and cvxpy for more details
         opt_solution_state = solutions[0].type(tensor_dtype)
         opt_solution_vel = solutions[1].type(tensor_dtype)
 
@@ -152,7 +156,10 @@ class NRMP(torch.nn.Module):
     def generate_parameter_value(
         self, nom_s, nom_u, ref_s, ref_us, mu_list, lam_list, point_list
     ):
-        
+        """
+        为定义的参数赋值
+        输入分别为预测状态、最优控制序列、参考状态、参考速度（有正负）、mu、lambda、点云
+        """
         adjust_value_list = self.generate_adjust_parameter_value()
 
         state_value_list = self.robot.generate_state_parameter_value(
@@ -169,8 +176,7 @@ class NRMP(torch.nn.Module):
         return self.adjust_parameters
 
     def update_adjust_parameters_value(self, **kwargs):
-
-        '''
+        """
         Update the adjust parameters value: q_s, p_u, eta, d_max, d_min
 
         Args:
@@ -183,14 +189,16 @@ class NRMP(torch.nn.Module):
             eta: float, slack gain for L1 regularization
             d_max: float, the maximum safety distance
             d_min: float, the minimum safety distance
-        '''
+        """
 
         q_s_value = kwargs.get("q_s", self.q_s)
 
         if self.q_s.dim() == 0:
             if isinstance(q_s_value, (list, np.ndarray)):
                 value = q_s_value[0]
-                print(f"q_s should be a scalar when initialized as scalar, got list/array with {len(q_s_value)} elements. Using the first element: {value}")
+                print(
+                    f"q_s should be a scalar when initialized as scalar, got list/array with {len(q_s_value)} elements. Using the first element: {value}"
+                )
 
             self.q_s = value_to_tensor(value, True)
 
@@ -198,10 +206,14 @@ class NRMP(torch.nn.Module):
             if isinstance(q_s_value, (list, np.ndarray)):
                 q_s_array = np.array(q_s_value).flatten()
                 if q_s_array.shape[0] != 3:
-                    raise ValueError(f"q_s must be a scalar or a 3-element list/array, got {q_s_array.shape[0]} elements")
+                    raise ValueError(
+                        f"q_s must be a scalar or a 3-element list/array, got {q_s_array.shape[0]} elements"
+                    )
                 np_q_s = q_s_array.reshape(3, 1)
             else:
-                raise ValueError(f"q_s must be a 3d list, np.ndarray, or torch.Tensor, got {type(q_s_value)}")
+                raise ValueError(
+                    f"q_s must be a 3d list, np.ndarray, or torch.Tensor, got {type(q_s_value)}"
+                )
 
             self.q_s = np_to_tensor(np_q_s, True).reshape(3, 1)
 
@@ -216,15 +228,14 @@ class NRMP(torch.nn.Module):
             else [self.q_s, self.p_u, self.eta, self.d_max, self.d_min]
         )
 
-
     def generate_coefficient_parameter_value(self, mu_list, lam_list, point_list):
         """
         generate the parameters values for obstacle point avoidance
 
         Args:
-            mu_list: list of mu matrix,
-            lam_list: list of lam matrix,
-            point_list: list of sorted obstacle points,
+            mu_list: list of mu matrix,tensor
+            lam_list: list of lam matrix,tensor
+            point_list: list of sorted obstacle points,tensor
 
         Returns:
             fa_list: list of fa matrix,
@@ -243,9 +254,10 @@ class NRMP(torch.nn.Module):
                 for t in range(self.T):
                     mu, lam, point = mu_list[t + 1], lam_list[t + 1], point_list[t + 1]
                     fa = lam.T
-                    temp = (
-                        torch.bmm(lam.T.unsqueeze(1), point.T.unsqueeze(2))
-                    ).squeeze(1)
+                    # temp = (
+                    #     torch.bmm(lam.T.unsqueeze(1), point.T.unsqueeze(2))
+                    # ).squeeze(1)
+                    temp = torch.sum(lam.T * point.T, dim=1, keepdim=True)
 
                     fb = temp + mu.T @ self.h
 

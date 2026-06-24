@@ -1,4 +1,3 @@
-
 """
 InitialPath is the class for generating the naive initial path for NeuPAN from the given waypoints.
 
@@ -24,6 +23,7 @@ from math import tan, inf, cos, sin, sqrt
 from gctl import curve_generator
 from neupan.util import WrapToPi, distance
 import math
+
 
 class InitialPath:
     """
@@ -63,10 +63,12 @@ class InitialPath:
         # initial path and gear
         self.initial_path = None
 
-        
-
-    def generate_nom_ref_state(self, state: np.ndarray, cur_vel_array: np.ndarray, ref_speed: float):
+    def generate_nom_ref_state(
+        self, state: np.ndarray, cur_vel_array: np.ndarray, ref_speed: float
+    ):
         """
+        返回预测状态、最优控制序列、参考状态和参考速度（有正负）
+
         state: current state of the robot, shape (3, 1)
         cur_vel_array: current velocity array of the robot, shape (2, T)
         """
@@ -76,38 +78,43 @@ class InitialPath:
         ref_index = self.point_index
         pre_state = state.copy()
 
+        # 利用运动学模型预测的状态
         state_pre_list = [pre_state]
+        # 从参考轨迹上选取的参考状态
         state_ref_list = [ref_state]
 
         assert self.cur_point.shape[0] >= 4
+        # 当前点是否需要倒车，倒车则预测的全为负
         gear_list = [self.cur_point[-1, 0]] * self.T
 
         ref_speed_forward = ref_speed * self.dt
 
         for t in range(self.T):
+
             pre_state = self.motion_predict_model(
                 pre_state, cur_vel_array[:, t : t + 1], self.robot.L, self.dt
             )
             state_pre_list.append(pre_state)
 
+            # 如果步长大于路径点间隔，直接用整数除法计算应该跳过几个点
             if ref_speed_forward >= self.interval:
                 inc_index = int((ref_speed_forward) / self.interval)
                 ref_index = ref_index + inc_index
-
+                # 如果超出路径索引范围则设为最后一个点并停车
                 if ref_index > len(self.cur_curve) - 1:
                     ref_index = len(self.cur_curve) - 1
                     gear_list[t] = 0
 
                 ref_state = self.cur_curve[ref_index][0:3]
-
+            # 如果步长小于路径点间隔，利用插值计算参考点
             else:
                 ref_state, ref_index = self.find_interaction_point(
                     ref_state, ref_index, ref_speed_forward
                 )
-
+                # 这里不需要设为最后一个点，因为插值法会自动处理
                 if ref_index > len(self.cur_curve) - 1:
                     gear_list[t] = 0
-
+            # 防止角度突变
             diff = ref_state[2, 0] - pre_state[2, 0]
             ref_state[2, 0] = pre_state[2, 0] + WrapToPi(diff)
             state_ref_list.append(ref_state)
@@ -126,13 +133,13 @@ class InitialPath:
         return nom_s, nom_u, ref_s, ref_us
 
     def set_initial_path(self, path):
-
-        '''
+        """
+        根据传入的path设置initial path、计算平均间隔距离并切分为多个曲线
         set the initial path from the given path
 
         Args:
             path: list of points, each point is a numpy array of shape (4, 1)
-        '''
+        """
 
         self.initial_path = path
         self.interval = self.cal_average_interval(path)
@@ -140,21 +147,20 @@ class InitialPath:
         self.curve_index = 0
         self.point_index = 0
 
-
     def cal_average_interval(self, path):
-
-        '''
+        """
+        根据传入的路径计算平均间隔距离
         calculate the average interval of the given path
 
         Args:
             path: list of points, each point is a numpy array of shape (4, 1)
-        '''
+        """
 
         n = len(path)
 
         if n < 2:
             return 0
-        
+
         dist_sum = 0.0
         for point1, point2 in zip(path, path[1:]):
             x1, y1 = point1[0:2]
@@ -164,6 +170,9 @@ class InitialPath:
         return dist_sum / (n - 1)
 
     def closest_point(self, state, threshold=0.1, ind_range=10):
+        """
+        在self.cur_curve中寻找距离当前最近的点，并更新self.point_index，返回距离
+        """
 
         min_dis = inf
         cur_index = self.point_index
@@ -183,6 +192,9 @@ class InitialPath:
         return min_dis
 
     def find_interaction_point(self, ref_state, ref_index, length):
+        """
+        寻找插值点
+        """
 
         circle = np.squeeze(ref_state[0:2])
 
@@ -210,6 +222,9 @@ class InitialPath:
                 ref_index += 1
 
     def range_cir_seg(self, circle, r, segment):
+        """
+        计算圆和线段的交点
+        """
 
         # find the intersection point between the circle and the segment
 
@@ -252,16 +267,21 @@ class InitialPath:
         self,
         state,
     ):
+        """
+        通过检查到达的曲线是否为最后一段曲线，判断是否到达目标点
+        """
 
         self.init_check(state)  # check if the initial path is set
         self.closest_point(
             state, self.close_threshold, self.ind_range
         )  # find the closest point on the path
 
-        if self.check_curve_arrive(state, self.arrive_threshold, self.arrive_index_threshold):
-            
+        if self.check_curve_arrive(
+            state, self.arrive_threshold, self.arrive_index_threshold
+        ):
+
             if self.curve_index + 1 >= self.curve_number:
-                
+
                 if self.loop:
                     self.curve_index = 0
                     self.point_index = 0
@@ -282,23 +302,28 @@ class InitialPath:
         return False
 
     def check_curve_arrive(self, state, arrive_threshold=0.1, arrive_index_threshold=2):
+        """
+        通过距离和索引判断是否到达当前曲线的末尾
+        """
 
         final_point = self.cur_curve[-1][0:2]
         arrive_distance = np.linalg.norm(state[0:2] - final_point)
 
-        return(
-            arrive_distance < arrive_threshold
-            and self.point_index >= (len(self.cur_curve) - arrive_index_threshold - 2)
+        return arrive_distance < arrive_threshold and self.point_index >= (
+            len(self.cur_curve) - arrive_index_threshold - 2
         )
 
     def split_path_with_gear(self):
         """
+        根据运动方向的改变，将initial path分为多个曲线
         split initial path into multiple curves by gear
         """
 
+        # self中是否存在名为initial_path的属性
         if not hasattr(self, "initial_path"):
             raise AttributeError("Object must have a 'initial_path' attribute")
 
+        # 根据运动方向的改变，将path分为多个曲线
         self.curve_list = []
         current_curve = []
         current_gear = self.initial_path[0][-1]
@@ -316,6 +341,9 @@ class InitialPath:
             self.curve_list.append(current_curve)
 
     def init_path_with_state(self, state):
+        """
+        将机器人当前点插入目标路点中，并生成轨迹
+        """
 
         assert len(self.waypoints) > 0, "Error: waypoints are not set"
 
@@ -331,7 +359,7 @@ class InitialPath:
             self.curve_style, self.waypoints, self.interval, self.min_radius, True
         )
 
-        if self.curve_style == 'line':
+        if self.curve_style == "line":
             # Ensure consistent angles for line curve
             self._ensure_consistent_angles()
 
@@ -350,7 +378,9 @@ class InitialPath:
         self.point_index = 0
 
     def update_initial_path_from_goal(self, start, goal):
-
+        """
+        通过输入的起始点和目标点生成初始轨迹
+        """
         if self.loop:
             waypoints = [start, goal, start]
         else:
@@ -359,8 +389,8 @@ class InitialPath:
         self.initial_path = self.cg.generate_curve(
             self.curve_style, waypoints, self.interval, self.min_radius, True
         )
-        
-        if self.curve_style == 'line':
+
+        if self.curve_style == "line":
             # Ensure consistent angles for line curve
             self._ensure_consistent_angles()
 
@@ -371,11 +401,14 @@ class InitialPath:
         self.waypoints = waypoints
 
     def set_ipath_with_waypoints(self, waypoints):
+        """
+        通过输入的路点生成初始轨迹
+        """
         self.initial_path = self.cg.generate_curve(
             self.curve_style, waypoints, self.interval, self.min_radius, True
         )
-        
-        if self.curve_style == 'line':
+
+        if self.curve_style == "line":
             # Ensure consistent angles for line curve
             self._ensure_consistent_angles()
 
@@ -386,19 +419,25 @@ class InitialPath:
         self.waypoints = waypoints
 
     def motion_predict_model(self, robot_state, vel, wheel_base, sample_time):
+        """
+        调用运动方程预测下一时刻状态
+        """
 
         if self.robot.kinematics == "acker":
             next_state = self.ackermann_model(robot_state, vel, wheel_base, sample_time)
 
         elif self.robot.kinematics == "diff":
             next_state = self.diff_model(robot_state, vel, sample_time)
-        
+
         elif self.robot.kinematics == "omni":
             next_state = self.omni_model(robot_state, vel, sample_time)
 
         return next_state
 
     def ackermann_model(self, car_state, vel, wheel_base, sample_time):
+        """
+        阿克曼转向的运动学模型
+        """
 
         assert car_state.shape == (3, 1) and vel.shape == (2, 1)
 
@@ -416,6 +455,9 @@ class InitialPath:
         return next_state
 
     def diff_model(self, robot_state, vel, sample_time):
+        """
+        差速转向的运动学模型
+        """
 
         assert robot_state.shape == (3, 1) and vel.shape == (2, 1)
 
@@ -430,8 +472,11 @@ class InitialPath:
         # next_state[2, 0] = wraptopi(next_state[2, 0])
 
         return next_state
-    
+
     def omni_model(self, robot_state, vel, sample_time):
+        """
+        全向转向的运动学模型
+        """
 
         assert robot_state.shape[0] >= 2 and vel.shape == (2, 1)
 
@@ -440,7 +485,7 @@ class InitialPath:
         omni_vel = np.array([[vx], [vy], [0]])
 
         next_state = robot_state + sample_time * omni_vel
-       
+
         return next_state
 
     @property
@@ -460,10 +505,15 @@ class InitialPath:
         return len(self.curve_list)
 
     def default_turn_radius(self):
+        """
+        如果是阿克曼转向，计算最小转弯半径
+        """
 
         if self.robot.kinematics == "acker":
             max_psi = self.robot.max_speed[1]
-            default_radius = self.robot.L / tan(max_psi)  # radius =  wheelbase / tan(psi)
+            default_radius = self.robot.L / tan(
+                max_psi
+            )  # radius =  wheelbase / tan(psi)
         else:
             default_radius = 0.0
 
@@ -471,27 +521,31 @@ class InitialPath:
 
     def _ensure_consistent_angles(self):
         """
+        将initial path中连线的斜率作为每个点的角度
         Ensure that all points in the initial path have consistent angles.
         For line curves, angles should represent the direction of travel.
         """
         if self.initial_path is None or len(self.initial_path) < 2:
             return
-        
+
         for i in range(len(self.initial_path) - 1):
             current_point = self.initial_path[i]
             next_point = self.initial_path[i + 1]
-            
+
             dx = next_point[0, 0] - current_point[0, 0]
             dy = next_point[1, 0] - current_point[1, 0]
-            
+
             theta = math.atan2(dy, dx)
-            
+
             current_point[2, 0] = theta
-        
+
         if len(self.initial_path) >= 2:
             self.initial_path[-1][2, 0] = self.initial_path[-2][2, 0]
 
     def trans_to_np_list(self, point_list):
+        """
+        转为包含numpy列向量的列表
+        """
 
         if point_list is None:
             return []

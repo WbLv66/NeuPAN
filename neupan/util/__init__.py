@@ -1,4 +1,4 @@
-'''
+"""
 util file contains the utility functions for NeuPAN.
 
 Developed by Ruihua Han
@@ -16,7 +16,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with NeuPAN planner. If not, see <https://www.gnu.org/licenses/>.
-'''
+"""
 
 import time
 from neupan import configuration
@@ -26,8 +26,10 @@ from math import sqrt, pi, cos, sin
 import numpy as np
 import neupan
 
+
 def time_it(name="Function"):
     """
+    time_it 的修饰器，用于统计函数执行时间和执行次数，每个函数相互独立
     Decorator to measure function execution time with instance attribute check.
 
     Args:
@@ -74,7 +76,7 @@ def file_check(file_name):
 
     if file_name is None:
         return None
-    
+
     if os.path.exists(file_name):
         abs_file_name = file_name
     elif os.path.exists(sys.path[0] + "/" + file_name):
@@ -94,10 +96,11 @@ def file_check(file_name):
     return abs_file_name
 
 
-
 def WrapToPi(rad: float, positive: bool = False) -> float:
-    '''The function `WrapToPi` transforms an angle in radians to the range [-pi, pi].
-    
+    """
+    将角度转换到[-pi, pi]范围内
+    The function `WrapToPi` transforms an angle in radians to the range [-pi, pi].
+
     Args:
 
         rad (float): Angle in radians.
@@ -106,11 +109,11 @@ def WrapToPi(rad: float, positive: bool = False) -> float:
         it around if it exceeds the bounds.
 
         positive (bool): Whether to return the positive value of the angle. Useful for angles difference.
-    
+
     Returns:
         The function `WrapToPi(rad)` returns the angle `rad` wrapped to the range [-pi, pi].
-    
-    '''
+
+    """
     while rad > pi:
         rad = rad - 2 * pi
     while rad < -pi:
@@ -121,6 +124,7 @@ def WrapToPi(rad: float, positive: bool = False) -> float:
 
 def distance(point1: np.ndarray, point2: np.ndarray) -> float:
     """
+    计算两点的距离
     Compute the distance between two points.
 
     Args:
@@ -135,6 +139,7 @@ def distance(point1: np.ndarray, point2: np.ndarray) -> float:
 
 def get_transform(state: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
+    通过state生成旋转和平移矩阵
     Get rotation and translation matrices from state.
 
     Args:
@@ -157,9 +162,9 @@ def get_transform(state: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return trans, rot
 
 
-
 def gen_inequal_from_vertex(vertex: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
+    通过顶点生成不等约束
     Generate inequality constraints for a convex polygon.
 
     Args:
@@ -171,15 +176,16 @@ def gen_inequal_from_vertex(vertex: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     convex_flag, order = is_convex_and_ordered(vertex)
 
     if not convex_flag:
+        # 非凸
         print("The polygon constructed by vertex is not convex.")
         return None, None
 
     if order == "CW":
+        # 顺时针方向，需要调整为逆时针方向
         first_point = vertex[:, 0:1]
         rest_points = vertex[:, 1:]
-        vertex = np.hstack([first_point, rest_points[:, ::-1]]) 
+        vertex = np.hstack([first_point, rest_points[:, ::-1]])
 
-        
     num = vertex.shape[1]
 
     G = np.zeros((num, 2))
@@ -208,6 +214,7 @@ def gen_inequal_from_vertex(vertex: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 
 def is_convex_and_ordered(points):
     """
+    检查多边形是否为凸，以及是否按顺时针或逆时针方向排序
     Determine if the polygon is convex and return the order (CW or CCW).
 
     Args:
@@ -243,6 +250,7 @@ def is_convex_and_ordered(points):
 
 def cross_product(o, a, b):
     """
+    计算oa和ob的叉积
     Compute the cross product of vectors OA and OB.
 
     Args:
@@ -280,16 +288,16 @@ def repeat_mk_dirs(path, max_num=100):
                     break
             os.makedirs(new_path)
             return new_path
-        
+
 
 def downsample_decimation(mat, m):
     """
     Downsamples a dim x n matrix to a dim x m matrix using direct sampling uniformly.
-    
+
     Parameters:
         mat: numpy.ndarray of shape (dim, n)
         m: integer, number of columns in the downsampled matrix (m < n)
-    
+
     Returns:
         numpy.ndarray of shape (dim, m)
     """
@@ -298,9 +306,8 @@ def downsample_decimation(mat, m):
 
     if m >= n:
         return mat
-    
+
     indices = np.linspace(0, n - 1, m).astype(int)
-    
+
     sampled_matrix = mat[:, indices]
     return sampled_matrix
-
